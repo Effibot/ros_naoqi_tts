@@ -84,10 +84,10 @@ class WebServer(Node):
         self.on_message(data)
         await websocket.send(response)
 
-        def start_server(self):
-            server = websockets.serve(self.handler, self.host_ip, self.host_port)
-            asyncio.get_event_loop().run_until_complete(server)
-            asyncio.get_event_loop().run_forever()
+    def start_server(self):
+        server = websockets.serve(self.handler, self.host_ip, self.host_port)
+        asyncio.get_event_loop().run_until_complete(server)
+        asyncio.get_event_loop().run_forever()
 
         #
 
@@ -117,6 +117,7 @@ if __name__ == "__main__":
     # web_server.on_open()
     # web_server.ws.run_forever()
     try:
+        web_server.start_server()
         rclpy.spin(web_server)
     except KeyboardInterrupt:
         web_server.get_logger().info("Keyboard Interrupt (SIGINT)")

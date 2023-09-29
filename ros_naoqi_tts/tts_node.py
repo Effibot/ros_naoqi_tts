@@ -29,7 +29,7 @@ class TTSNode(Node):
             ParameterDescriptor(description="Encoding to use, default: utf-8"),
         )
         self.tts_core_script = os.path.join(
-            get_package_share_directory("naoqi_driver"),
+            get_package_share_directory("ros_naoqi_tts"),
             "src",
             "tts_core.py",
         )

@@ -3,9 +3,9 @@
 <package format="3">
   <name>ros_naoqi_tts</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>implementation of tts service through android, naoqi sdk and ros2</description>
   <maintainer email="andrea.efficace1@gmail.com">andrea efficace</maintainer>
-  <license>LICENSE</license>
+  <license>Apache License 2</license>
 
   <depend>rclpy</depend>
 

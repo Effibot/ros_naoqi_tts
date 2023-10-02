@@ -3,6 +3,7 @@
 #!/usr/bin/python
 
 import asyncio
+import datetime
 import sys
 import threading
 import time
@@ -17,9 +18,14 @@ from std_msgs.msg import String
 from websocket import create_connection
 
 
-class WebServer(Node):
+class WebNode(Node):
     def __init__(self):
-        self.logger = self.get_logger()
+        super().__init__(
+            "web_node",
+            allow_undeclared_parameters=True,
+            automatically_declare_parameters_from_overrides=True,
+        )  # type: ignore
+        self.logger = rclpy.logging.get_logger("WS_node")  # type: ignore
         # declare params
         self.declare_parameter(
             "host_ip",
@@ -63,64 +69,83 @@ class WebServer(Node):
         )
         # declare publisher for tts_node
         self.publisher = self.create_publisher(String, "web_server", 10)
+
+
+class WebServer:
+    def __init__(self) -> None:
+        # get reference to node class
+        self.node = WebNode()
         websocket.enableTrace(True)
-        # self.ws = websocket.WebSocketApp(
-        #    f"ws//{self.host_ip}:{self.host_port}",
-        #    on_message=self.on_message,
-        #    on_error=self.on_error,
-        #    on_close=self.on_close,
-        # )
+        self.ws = websocket.WebSocketApp(
+            f"ws://{self.node.host_ip}:{self.node.host_port}",
+            on_message=lambda ws, msg: self.on_message(ws, msg),
+            on_error=lambda ws, error: self.on_error(ws, error),
+            on_close=lambda ws: self.on_close(ws),
+        )
+        self.client_count = 0
+        self.start_time = datetime.datetime.now()
+        self.current_time = datetime.datetime.now()
+        self.on_open_function = lambda ws: self.on_open(ws)
+        self.is_open = False
 
-    def on_message(self, message):
+    def on_message(self, ws, message):
+        self.node.logger.info("received message")  # log message
         msg = String()
-        msg.data = str(message, self.encoding)
-        self.publisher.publish(msg)  # publish to tts_node
-        self.logger.info("received message")  # log message
-        # self.ws.send(str(1))  # ACK
+        msg.data = str(message, self.node.encoding)
+        self.node.publisher.publish(msg)  # publish to tts_node
+        self.node.logger.info("published message")  # log message
 
-    async def handler(self, websocket, path):
-        data = await websocket.recv()
-        response = f"1"
-        self.on_message(data)
-        await websocket.send(response)
+    def on_error(self, ws, error):
+        self.node.logger.error(error)
+        self.node.destroy_node()
+        sys.exit(1)
 
-    def start_server(self):
-        server = websockets.serve(self.handler, self.host_ip, self.host_port)
-        asyncio.get_event_loop().run_until_complete(server)
-        asyncio.get_event_loop().run_forever()
+    def on_close(self, ws):
+        self.node.logger.info(
+            f"closed connection at {self.node.host_ip}:{self.node.host_port}"
+        )
+        self.client_count -= 1
 
-        #
+    def run(self, *args):
+        time.sleep(1)
+        self.ws.send(f"1")
+        while self.client_count > 0:
+            time.sleep(10)
+            self.current_time = datetime.datetime.now()
+            uptime = self.current_time - self.start_time
+            self.node.logger.info(f"The server has been up for: {uptime}")
+        self.node.logger.info("no active clients closing connection")
+        self.ws.close()
 
-        #
-        #    def on_error(self, error):
-        #        self.logger.error(error)
-        #        self.destroy_node()
-        #        sys.exit(1)
-        #
-        #    def on_close(self):
-        #        self.logger.info("closed connection")
-        #
-        #    def run(self, *args):
-        #        time.sleep(10)
-        #        self.ws.close()
-        #        self.logger.info("thread terminating")
-        #
-        #    def on_open(self):
-        #        self.logger.info("opened connection")
+    def on_open(self, ws):
+        self.node.logger.info(
+            f"opened connection at {self.node.host_ip}:{self.node.host_port}"
+        )
+        self.client_count += 1
+        threading.Thread(target=self.run, args=()).start()
 
-        # threading.Thread(target=self.run, args=()).start()
+    def ros_spinner(self):
+        try:
+            rclpy.spin_once(self.node)  # spin once
+        except KeyboardInterrupt:
+            self.node.logger.info("Keyboard Interrupt (SIGINT)")
+        finally:
+            self.node.logger.info("node stopped")
+
+
+def main(args=None):
+    rclpy.init()
+    web_server = WebServer()
+    web_server.ws.on_open = web_server.on_open_function
+    try:
+        web_server.is_open = web_server.ws.run_forever()
+        # web_server.start_server()
+    except KeyboardInterrupt:
+        web_server.node.get_logger().info("Keyboard Interrupt (SIGINT)")
+    finally:
+        web_server.node.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == "__main__":
-    rclpy.init()
-    web_server = WebServer()
-    # web_server.on_open()
-    # web_server.ws.run_forever()
-    try:
-        web_server.start_server()
-        rclpy.spin(web_server)
-    except KeyboardInterrupt:
-        web_server.get_logger().info("Keyboard Interrupt (SIGINT)")
-    finally:
-        web_server.destroy_node()
-        rclpy.shutdown()
+    main()

@@ -10,33 +10,43 @@ from std_msgs.msg import String
 
 class TTSNode(Node):
     def __init__(self):
-        self.logger = self.get_logger()
+        super().__init__(
+            "tts_node",
+            allow_undeclared_parameters=True,
+            automatically_declare_parameters_from_overrides=True,
+        )  # type: ignore
+
+        # get logger
+        self.logger = rclpy.logging.get_logger("tts_node")  # type: ignore
+        # declare params
         self.declare_parameter(
-            "ip",
+            "robot_ip",
             "127.0.0.1",
             ParameterDescriptor(
                 description="Ip address of the robot, default: 127.0.0.1"
             ),
         )
         self.declare_parameter(
-            "port",
-            "9959",
-            ParameterDescriptor(description="Port of the robot, default: 9959"),
+            "robot_port",
+            "9559",
+            ParameterDescriptor(description="Port of the robot, default: 9559"),
         )
         self.declare_parameter(
             "encoding",
             "utf-8",
             ParameterDescriptor(description="Encoding to use, default: utf-8"),
         )
+
+        self.ip = self.get_parameter("robot_ip").get_parameter_value().string_value
+        self.port = self.get_parameter("robot_port").get_parameter_value().string_value
+        self.encoding = (
+            self.get_parameter("encoding").get_parameter_value().string_value
+        )
+
         self.tts_core_script = os.path.join(
             get_package_share_directory("ros_naoqi_tts"),
             "src",
             "tts_core.py",
-        )
-        self.ip = self.get_parameter("ip").get_parameter_value().string_value
-        self.port = self.get_parameter("port").get_parameter_value().integer_value
-        self.encoding = (
-            self.get_parameter("encoding").get_parameter_value().string_value
         )
 
         self.subscription = self.create_subscription(
@@ -60,11 +70,12 @@ class TTSNode(Node):
 
     def tts_callback(self, msg: String):
         # received the text to say -> run the service
-        self.run_tts_service(self.ip, str(self.port), msg.data, self.encoding)
+        self.logger.info("Received: message, starting ALTextToSpeech service")
+        self.run_tts_service(self.ip, self.port, msg.data, self.encoding)
 
 
-def main():
-    rclpy.init()
+def main(args=None):
+    rclpy.init(args=args)
     tts_node = TTSNode()
     try:
         rclpy.spin(tts_node)

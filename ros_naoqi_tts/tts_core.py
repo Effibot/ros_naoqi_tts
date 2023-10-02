@@ -58,7 +58,7 @@ if __name__ == "__main__":
     # IP address of the robot
     parser.add_argument("--ip", type=str, default="127.0.0.1", help="Robot IP address")
     # Port number of the robot
-    parser.add_argument("--port", type=int, default=9559, help="Robot port number")
+    parser.add_argument("--port", type=str, default="9559", help="Robot port number")
     # Language
     parser.add_argument(
         "--language", type=str, default="Italian", help="Robot language"

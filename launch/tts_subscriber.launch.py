@@ -34,9 +34,10 @@ def generate_launch_description():
         executable="tts_node",
         name="tts_node",
         output="screen",
+        namespace="tts_node",
         parameters=[
-            {"ip": nao_ip},
-            {"port": nao_port},
+            {"robot_ip": nao_ip},
+            {"robot_port": nao_port},
             {"encoding": encoding},
         ],
     )

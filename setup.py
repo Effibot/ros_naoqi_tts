@@ -25,6 +25,9 @@ setup(
     license="Apache License 2.0",
     tests_require=["pytest"],
     entry_points={
-        "console_scripts": ["tts_node = ros_naoqi_tts.tts_node:main"],
+        "console_scripts": [
+            "tts_node = ros_naoqi_tts.tts_node:main",
+            "web_server = ros_naoqi_tts.web_server:main",
+        ],
     },
 )

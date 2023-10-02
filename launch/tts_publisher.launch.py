@@ -33,11 +33,14 @@ def generate_launch_description():
         package="ros_naoqi_tts",
         executable="web_server",
         name="web_server",
+        namespace="web_server",
         output="screen",
         parameters=[
-            {"ip": host_ip},
-            {"port": host_port},
+            {"host_ip": host_ip},
+            {"host_port": host_port},
             {"encoding": encoding},
+            {"nao_ip": "127.0.0.1"},
+            {"nao_port": "9559"},
         ],
     )
 

@@ -12,8 +12,6 @@ class TTSNode(Node):
     def __init__(self):
         super().__init__(
             "tts_node",
-            allow_undeclared_parameters=True,
-            automatically_declare_parameters_from_overrides=True,
         )  # type: ignore
 
         # get logger

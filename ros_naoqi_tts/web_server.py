@@ -10,21 +10,14 @@ import time
 from concurrent.futures import thread
 
 import rclpy
-import websocket
-import websockets
 from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 from std_msgs.msg import String
-from websocket import create_connection
 
 
 class WebNode(Node):
     def __init__(self):
-        super().__init__(
-            "web_node",
-            allow_undeclared_parameters=True,
-            automatically_declare_parameters_from_overrides=True,
-        )  # type: ignore
+        super().__init__("web_node")  # type: ignore
         self.logger = rclpy.logging.get_logger("WS_node")  # type: ignore
         # declare params
         self.declare_parameter(
@@ -53,8 +46,8 @@ class WebNode(Node):
         )
         self.declare_parameter(
             "nao_port",
-            "9959",
-            ParameterDescriptor(description="Port of the robot, default: 9959"),
+            "9559",
+            ParameterDescriptor(description="Port of the robot, default: 9559"),
         )
         self.host_ip = self.get_parameter("host_ip").get_parameter_value().string_value
         self.host_port = (
@@ -70,62 +63,89 @@ class WebNode(Node):
         # declare publisher for tts_node
         self.publisher = self.create_publisher(String, "web_server", 10)
 
+        # declare timer callback to force the node to spin when no messages are received by the server
+        self.timer_period = 0.5
+        self.msg = String()
+        self.timer = self.create_timer(self.timer_period, self.timer_callback)
+
+        # declare boolean var to check if the node spin at least once
+        self.is_spin_once = False
+
+    def set_msg(self, msg):
+        if isinstance(msg, str):
+            self.msg = String(data=msg)
+        self.msg = msg
+
+    def get_msg(self):
+        return self.msg
+
+    def timer_callback(self):
+        # check if the node has spin at least once
+        if not self.is_spin_once:
+            self.logger.info("Spinning once")
+            self.is_spin_once = True
+        else:
+            # just forward the message
+            self.forward_message()
+
+    def forward_message(self):
+        self.logger.info("received message")  # log message
+        self.publisher.publish(self.msg)  # publish to tts_node
+        self.logger.info("published message")  # log message
+
+
+import socket
+
 
 class WebServer:
     def __init__(self) -> None:
         # get reference to node class
         self.node = WebNode()
-        websocket.enableTrace(True)
-        self.ws = websocket.WebSocketApp(
-            f"ws://{self.node.host_ip}:{self.node.host_port}",
-            on_message=lambda ws, msg: self.on_message(ws, msg),
-            on_error=lambda ws, error: self.on_error(ws, error),
-            on_close=lambda ws: self.on_close(ws),
-        )
+        # spin the node once
+        self.ros_spinner()
+        # create the server
+        self.host = self.node.host_ip
+        self.port = self.node.host_port
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.bind((self.host, self.port))
+        # set total number of clients
+        self.server_socket.listen(1)
         self.client_count = 0
         self.start_time = datetime.datetime.now()
-        self.current_time = datetime.datetime.now()
-        self.on_open_function = lambda ws: self.on_open(ws)
-        self.is_open = False
+        self.current_time = None
+        self.msg = ""
 
-    def on_message(self, ws, message):
-        self.node.logger.info("received message")  # log message
-        msg = String()
-        msg.data = str(message, self.node.encoding)
-        self.node.publisher.publish(msg)  # publish to tts_node
-        self.node.logger.info("published message")  # log message
-
-    def on_error(self, ws, error):
-        self.node.logger.error(error)
-        self.node.destroy_node()
-        sys.exit(1)
-
-    def on_close(self, ws):
+    def accept_client(self):
+        # accept new connection
         self.node.logger.info(
-            f"closed connection at {self.node.host_ip}:{self.node.host_port}"
+            f"Waiting for connection on {self.host}:{self.port} [TCP]"
         )
-        self.client_count -= 1
+        client, address = self.server_socket.accept()
+        self.node.logger.info(f"Accepted connection from {address}")
+        # checks if the client sended all the data
+        while True:
+            try:
+                data = client.recv(1024).decode(self.node.encoding)
+                if data != "JOB_DONE":
+                    self.msg += data
+                    self.node.logger.info(f"Received: {data}")
+                    client.send("ACK".encode(self.node.encoding))
+                else:
+                    self.node.logger.info("Received all data")
+                    break
+            except:
+                break
 
-    def run(self, *args):
-        time.sleep(1)
-        self.ws.send(f"1")
-        while self.client_count > 0:
-            time.sleep(10)
-            self.current_time = datetime.datetime.now()
-            uptime = self.current_time - self.start_time
-            self.node.logger.info(f"The server has been up for: {uptime}")
-        self.node.logger.info("no active clients closing connection")
-        self.ws.close()
-
-    def on_open(self, ws):
-        self.node.logger.info(
-            f"opened connection at {self.node.host_ip}:{self.node.host_port}"
-        )
-        self.client_count += 1
-        threading.Thread(target=self.run, args=()).start()
+        # forward the message to the tts_node
+        self.node.set_msg(self.msg)
+        self.ros_spinner()
+        # close the connection
+        client.close()
+        self.node.logger.info("Connection closed")
 
     def ros_spinner(self):
         try:
+            self.node.logger.info("Starting ros spinner")
             rclpy.spin_once(self.node)  # spin once
         except KeyboardInterrupt:
             self.node.logger.info("Keyboard Interrupt (SIGINT)")
@@ -136,9 +156,9 @@ class WebServer:
 def main(args=None):
     rclpy.init()
     web_server = WebServer()
-    web_server.ws.on_open = web_server.on_open_function
     try:
-        web_server.is_open = web_server.ws.run_forever()
+        web_server.node.logger.info("Starting web server")
+        web_server.accept_client()
         # web_server.start_server()
     except KeyboardInterrupt:
         web_server.node.get_logger().info("Keyboard Interrupt (SIGINT)")

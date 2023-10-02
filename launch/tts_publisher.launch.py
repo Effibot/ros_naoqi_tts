@@ -20,7 +20,7 @@ def generate_launch_description():
         default_value="6000",
         description="Port to be used for the connection",
     )
-    host_port = LaunchConfiguration("port", default="9559")
+    host_port = LaunchConfiguration("host_port", default="6000")
     enc_declare = DeclareLaunchArgument(
         "encoding",
         default_value="utf-8",

@@ -3,8 +3,8 @@ import socket
 
 
 def client_program():
-    host = "localhost"  # as both code is running on same pc
-    port = 6000  # socket server port number
+    host = "192.168.130.103"  # as both code is running on same pc
+    port = 9090  # socket server port number
     try:
         client_socket = socket.socket()  # instantiate
         client_socket.connect((host, port))  # connect to the server

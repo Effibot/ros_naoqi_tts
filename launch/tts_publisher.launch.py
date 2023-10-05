@@ -17,10 +17,10 @@ def generate_launch_description():
     host_ip = LaunchConfiguration("host_ip")
     port_declare = DeclareLaunchArgument(
         "host_port",
-        default_value="6000",
+        default_value="9090",
         description="Port to be used for the connection",
     )
-    host_port = LaunchConfiguration("host_port", default="6000")
+    host_port = LaunchConfiguration("host_port", default="9090")
     enc_declare = DeclareLaunchArgument(
         "encoding",
         default_value="utf-8",

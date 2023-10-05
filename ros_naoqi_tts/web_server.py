@@ -2,16 +2,10 @@
 
 #!/usr/bin/python
 
-import asyncio
-import datetime
-import sys
-import threading
 import time
-from concurrent.futures import thread
 
 import rclpy
 from rcl_interfaces.msg import ParameterDescriptor
-from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from std_msgs.msg import String
 

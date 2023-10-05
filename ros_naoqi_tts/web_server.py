@@ -74,7 +74,8 @@ class WebNode(Node):
     def set_msg(self, msg):
         if isinstance(msg, str):
             self.msg = String(data=msg)
-        self.msg = msg
+        else:
+            self.msg = msg
 
     def get_msg(self):
         return self.msg
@@ -111,37 +112,58 @@ class WebServer:
         # set total number of clients
         self.server_socket.listen(1)
         self.client_count = 0
+        self.client = None
         self.start_time = datetime.datetime.now()
         self.current_time = None
+        self.is_closed = True
         self.msg = ""
 
+    def set_status(self, status: bool):
+        self.is_closed = status
+
+    def get_status(self):
+        return self.is_closed
+
     def accept_client(self):
-        # accept new connection
-        self.node.logger.info(
-            f"Waiting for connection on {self.host}:{self.port} [TCP]"
-        )
-        client, address = self.server_socket.accept()
-        self.node.logger.info(f"Accepted connection from {address}")
-        # checks if the client sended all the data
-        while True:
-            try:
-                data = client.recv(1024).decode(self.node.encoding)
+        try:
+            # accept new connection
+            self.node.logger.info(
+                f"Waiting for connection on {self.host}:{self.port} [TCP]"
+            )
+            self.client, address = self.server_socket.accept()
+            self.node.logger.info(f"Accepted connection from {address}")
+
+            # checks if the client sended all the data
+            while True:
+                data = self.client.recv(1024).decode(self.node.encoding)
                 if data != "JOB_DONE":
-                    self.msg += data
+                    self.msg += data + "\n"
                     self.node.logger.info(f"Received: {data}")
-                    client.send("ACK".encode(self.node.encoding))
+                    self.client.send("ACK".encode(self.node.encoding))
                 else:
                     self.node.logger.info("Received all data")
+                    self.client.send("JOB_DONE".encode(self.node.encoding))
+                    self.node.logger.info("Sent: JOB_DONE")
+                    # forward the message to the tts_node
+                    self.node.set_msg(self.msg)
+                    self.ros_spinner()
                     break
-            except:
-                break
+        except KeyboardInterrupt:
+            self.node.logger.info("Keyboard Interrupt (SIGINT)")
+        finally:
+            self.close_connection()
 
-        # forward the message to the tts_node
-        self.node.set_msg(self.msg)
-        self.ros_spinner()
-        # close the connection
-        client.close()
-        self.node.logger.info("Connection closed")
+    def close_connection(self):
+        # close the connection if it is open
+        if self.get_status():
+            self.set_status(False)
+            self.node.logger.info("Closing connection")
+            assert isinstance(self.client, socket.socket)
+            self.client.close()
+            self.server_socket.close()
+            self.node.logger.info("Connection closed")
+        else:
+            self.node.logger.info("Connection already closed")
 
     def ros_spinner(self):
         try:
@@ -159,7 +181,6 @@ def main(args=None):
     try:
         web_server.node.logger.info("Starting web server")
         web_server.accept_client()
-        # web_server.start_server()
     except KeyboardInterrupt:
         web_server.node.get_logger().info("Keyboard Interrupt (SIGINT)")
     finally:

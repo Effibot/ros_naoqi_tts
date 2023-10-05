@@ -26,7 +26,7 @@ class TTSNode(Node):
         )
         self.declare_parameter(
             "robot_port",
-            "9559",
+            9559,
             ParameterDescriptor(description="Port of the robot, default: 9559"),
         )
         self.declare_parameter(
@@ -36,16 +36,18 @@ class TTSNode(Node):
         )
 
         self.ip = self.get_parameter("robot_ip").get_parameter_value().string_value
-        self.port = self.get_parameter("robot_port").get_parameter_value().string_value
+        self.port = self.get_parameter("robot_port").get_parameter_value().integer_value
         self.encoding = (
             self.get_parameter("encoding").get_parameter_value().string_value
         )
 
         self.tts_core_script = os.path.join(
             get_package_share_directory("ros_naoqi_tts"),
-            "src",
+            "script",
             "tts_core.py",
         )
+
+        self.logger.info(f"tts_core_script path is: {self.tts_core_script}")
 
         self.subscription = self.create_subscription(
             String, "web_server", self.tts_callback, 10
@@ -54,7 +56,7 @@ class TTSNode(Node):
     def get_script(self):
         return self.tts_core_script
 
-    def run_tts_service(self, ip: str, port: str, text: str, encoding: str):
+    def run_tts_service(self, ip: str, port: int, text: str, encoding: str):
         subprocess.run(
             [
                 "python2",

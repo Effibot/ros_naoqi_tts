@@ -11,9 +11,12 @@ class TTSCore:
     def __init__(self):
         self.isConnected = False
         self.session = None
+        self.speak_move_service = None
         self.tts_service = None
-        self.tts_service_name = "ALTextToSpeech"
-        self.language = "Italian"
+        self.speak_move_service_name = "ALSpeakingMovement"
+        self.tts_service_name = "ALAnimatedSpeech"  # "ALTextToSpeech"
+        self.tts_body_language_conf = {"bodyLanguageMode": "contextual"}
+        # self.language = "Italian"
 
     def connect(self, ip, port, language):
         self.session = qi.Session()
@@ -21,7 +24,7 @@ class TTSCore:
             self.session.connect("tcp://" + ip + ":" + str(port))
             self.isConnected = True
             self.tts_service = self.session.service(self.tts_service_name)
-            self.tts_service.setLanguage(language)
+            # self.tts_service.setLanguage(language)
             print("Connected to Pepper")
         except RuntimeError:
             print(
@@ -39,15 +42,15 @@ class TTSCore:
             assert self.tts_service is not None
             # check if text is a string or a file
             # if isinstance(text, str):
-            #    # then just say it
-            #    self.tts_service.say(text)
+            # then just say it
+            self.tts_service.say(text, self.tts_body_language_conf)
 
             # else:
             # read the file with appropriate encoding and say it
-            with codecs.open(text, "r", encoding) as f:
-                content = f.read()
-                to_say = content.encode(encoding)
-            self.tts_service.say(to_say)
+            # with codecs.open(text, "r", encoding) as f:
+            #    content = f.read()
+            #    to_say = content.encode(encoding)
+            # self.tts_service.say(to_say)
         else:
             print("Not connected to Pepper")
 
@@ -58,7 +61,7 @@ if __name__ == "__main__":
     # IP address of the robot
     parser.add_argument("--ip", type=str, default="127.0.0.1", help="Robot IP address")
     # Port number of the robot
-    parser.add_argument("--port", type=str, default="9559", help="Robot port number")
+    parser.add_argument("--port", type=str, default=9959, help="Robot port number")
     # Language
     parser.add_argument(
         "--language", type=str, default="Italian", help="Robot language"

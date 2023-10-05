@@ -20,7 +20,7 @@ def generate_launch_description():
         default_value="9559",
         description="Port to be used for the connection",
     )
-    nao_port = LaunchConfiguration("port", default="9559")
+    nao_port = LaunchConfiguration("port", default=9559)
     enc_declare = DeclareLaunchArgument(
         "encoding",
         default_value="utf-8",
@@ -34,7 +34,6 @@ def generate_launch_description():
         executable="tts_node",
         name="tts_node",
         output="screen",
-        namespace="tts_node",
         parameters=[
             {"robot_ip": nao_ip},
             {"robot_port": nao_port},

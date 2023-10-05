@@ -33,7 +33,6 @@ def generate_launch_description():
         package="ros_naoqi_tts",
         executable="web_server",
         name="web_server",
-        namespace="web_server",
         output="screen",
         parameters=[
             {"host_ip": host_ip},

@@ -11,6 +11,7 @@ from concurrent.futures import thread
 
 import rclpy
 from rcl_interfaces.msg import ParameterDescriptor
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from std_msgs.msg import String
 
@@ -102,21 +103,17 @@ class WebServer:
     def __init__(self) -> None:
         # get reference to node class
         self.node = WebNode()
+        # self.executor = None
         # spin the node once
-        self.ros_spinner()
-        # create the server
+        # self.ros_spinner()
+        # get the host and port from the node
         self.host = self.node.host_ip
         self.port = self.node.host_port
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind((self.host, self.port))
-        # set total number of clients
-        self.server_socket.listen(1)
-        self.client_count = 0
+        # set the server socket to None
+        self.server_socket = None
+        # set the client to None
         self.client = None
-        self.start_time = datetime.datetime.now()
-        self.current_time = None
         self.is_closed = True
-        self.msg = ""
 
     def set_status(self, status: bool):
         self.is_closed = status
@@ -124,43 +121,73 @@ class WebServer:
     def get_status(self):
         return self.is_closed
 
-    def accept_client(self):
+    def create_server(self):
+        # create the server socket
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # set the socket option to reuse the address
+        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # bind the socket to the host and port
+        self.server_socket.bind((self.host, self.port))
+        # set total number of clients
+        self.server_socket.listen(1)
+        return self.server_socket
+
+    def connection_handler(self):
         try:
-            # accept new connection
             self.node.logger.info(
                 f"Waiting for connection on {self.host}:{self.port} [TCP]"
             )
-            self.client, address = self.server_socket.accept()
-            self.node.logger.info(f"Accepted connection from {address}")
-
-            # checks if the client sended all the data
             while True:
-                data = self.client.recv(1024).decode(self.node.encoding)
-                if data != "JOB_DONE":
-                    self.msg += data + "\n"
-                    self.node.logger.info(f"Received: {data}")
-                    self.client.send("ACK".encode(self.node.encoding))
+                server = self.create_server()
+                if self.get_status():
+                    client = self.accept_client(server)
+                    self.set_status(False)
+                    self.do_work(server, client)
+                    self.set_status(True)
                 else:
-                    self.node.logger.info("Received all data")
-                    self.client.send("JOB_DONE".encode(self.node.encoding))
-                    self.node.logger.info("Sent: JOB_DONE")
-                    # forward the message to the tts_node
-                    self.node.set_msg(self.msg)
-                    self.ros_spinner()
-                    break
+                    self.node.logger.info(
+                        f"Waiting for connection on {self.host}:{self.port} [TCP]"
+                    )
+                    time.sleep(1)
+
         except KeyboardInterrupt:
             self.node.logger.info("Keyboard Interrupt (SIGINT)")
         finally:
-            self.close_connection()
+            self.close_connection(self.server_socket, self.client)
 
-    def close_connection(self):
+    def do_work(self, server, client):
+        # checks if the client sended all the data
+        msg = ""
+        while True:
+            data = client.recv(4096).decode(encoding=self.node.encoding)
+            if data != "JOB_DONE":
+                msg += data + "\n"
+                self.node.logger.info(f"Received: {data}")
+                client.send("ACK".encode(self.node.encoding))
+            else:
+                self.node.logger.info("Received all data")
+                client.send("JOB_DONE".encode(self.node.encoding))
+                self.node.logger.info("Sent: JOB_DONE")
+                # forward the message to the tts_node
+                self.node.set_msg(msg)
+                self.ros_spinner()
+                self.close_connection(server, client)
+                break
+
+    def accept_client(self, server):
+        # accept new connection
+        self.client, address = server.accept()
+        self.node.logger.info(f"Accepted connection from {address}")
+        return self.client
+
+    def close_connection(self, server, client):
         # close the connection if it is open
-        if self.get_status():
+        if not self.get_status():
             self.set_status(False)
             self.node.logger.info("Closing connection")
             assert isinstance(self.client, socket.socket)
-            self.client.close()
-            self.server_socket.close()
+            client.close()
+            server.close()
             self.node.logger.info("Connection closed")
         else:
             self.node.logger.info("Connection already closed")
@@ -168,19 +195,33 @@ class WebServer:
     def ros_spinner(self):
         try:
             self.node.logger.info("Starting ros spinner")
-            rclpy.spin_once(self.node)  # spin once
+            # rclpy.spin_once(self.node, executor=self.executor)  # spin once
+            self.node.forward_message()
         except KeyboardInterrupt:
             self.node.logger.info("Keyboard Interrupt (SIGINT)")
         finally:
             self.node.logger.info("node stopped")
 
+    def set_executor(self, executor):
+        self.executor = executor
+
+
+def run_server(ws: WebServer):
+    ws.connection_handler()
+
+
+global executor
+
 
 def main(args=None):
     rclpy.init()
     web_server = WebServer()
+    # executor = MultiThreadedExecutor()
+    # executor.add_node(web_server.node)
+    # web_server.set_executor(executor)
     try:
         web_server.node.logger.info("Starting web server")
-        web_server.accept_client()
+        web_server.connection_handler()
     except KeyboardInterrupt:
         web_server.node.get_logger().info("Keyboard Interrupt (SIGINT)")
     finally:

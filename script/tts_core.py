@@ -3,6 +3,7 @@
 import argparse
 import codecs
 import sys
+from time import sleep
 
 import qi
 
@@ -40,17 +41,20 @@ class TTSCore:
     def say_from_file(self, text="Ciao Mondo", encoding="utf-8"):
         if self.isConnected:
             assert self.tts_service is not None
-            # check if text is a string or a file
-            # if isinstance(text, str):
-            # then just say it
-            self.tts_service.say(text, self.tts_body_language_conf)
+            # split the text in sentences
+            sentences = text.split(".")
+            for sentence in sentences:
+                # remove leading and trailing spaces
+                sentence = sentence.strip()
+                # skip empty sentences
+                if sentence == "":
+                    continue
+                else:
+                    # say the sentence
+                    self.tts_service.say(sentence, self.tts_body_language_conf)
+                    sleep(2)
+            # self.tts_service.say(text, self.tts_body_language_conf)
 
-            # else:
-            # read the file with appropriate encoding and say it
-            # with codecs.open(text, "r", encoding) as f:
-            #    content = f.read()
-            #    to_say = content.encode(encoding)
-            # self.tts_service.say(to_say)
         else:
             print("Not connected to Pepper")
 

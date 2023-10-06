@@ -153,7 +153,7 @@ class WebServer:
         # checks if the client sended all the data
         msg = ""
         while True:
-            data = client.recv(4096).decode(encoding=self.node.encoding)
+            data = client.recv(4096).decode(encoding=self.node.encoding).strip()
             if data != "JOB_DONE":
                 msg += data + "\n"
                 self.node.logger.info(f"Received: {data}")

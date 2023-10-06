@@ -157,10 +157,10 @@ class WebServer:
             if data != "JOB_DONE":
                 msg += data + "\n"
                 self.node.logger.info(f"Received: {data}")
-                client.send("ACK".encode(self.node.encoding))
+                client.send("ACK\n".encode(self.node.encoding))
             else:
                 self.node.logger.info("Received all data")
-                client.send("JOB_DONE".encode(self.node.encoding))
+                client.send("JOB_DONE\n".encode(self.node.encoding))
                 self.node.logger.info("Sent: JOB_DONE")
                 # forward the message to the tts_node
                 self.node.set_msg(msg)
